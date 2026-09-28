@@ -2,8 +2,12 @@ package tree;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.function.Consumer;
 
 /**
@@ -12,17 +16,18 @@ import java.util.function.Consumer;
  * <p><b>¿Que es y que se hizo?</b><br>
  * Implementa un arbol jerarquico donde cada nodo puede tener cero, uno o multiples
  * hijos, administrando una raiz unica y un conjunto de operaciones obligatorias
- * de consulta, manipulacion y auditoria estructural.</p>
+ * de consulta, manipulacion, recorridos (DFS y BFS) y renderizado visual en consola.</p>
  *
  * <p><b>¿Por que se uso?</b><br>
- * Cumple con las especificaciones de las Secciones 4, 5 y 7 de la rubrica.
+ * Cumple con las especificaciones de las Secciones 4, 5, 7, 8 y 9 de la rubrica.
  * En una plataforma educativa, una entidad (como una facultad o un semestre)
  * posee mas de dos dependencias directas, haciendo del arbol general la estructura
  * adecuada frente a limitaciones de arboles binarios.</p>
  *
  * <p><b>¿Como funciona?</b><br>
- * Opera mediante enlaces de memoria entre nodos {@link TreeNode}. Cada operacion
- * respeta las politicas institucionales de integridad referencial y gestion de niveles.</p>
+ * Opera mediante enlaces de memoria entre nodos {@link TreeNode}. Los recorridos
+ * aplican estrategias clasicas: DFS mediante recursion (pila de llamadas del sistema)
+ * y BFS mediante una cola FIFO (Queue) para procesar nivel a nivel.</p>
  *
  * @param <T> Tipo de datos almacenados en los nodos.
  */
@@ -289,5 +294,129 @@ public class Tree<T> {
             count += countNodes(child);
         }
         return count;
+    }
+
+    // =========================================================================
+    // RECORRIDOS OBLIGATORIOS DEL ARBOL (SECCION 8 DE LA RUBRICA)
+    // =========================================================================
+
+    /**
+     * Recorrido Obligatorio 1: Recorrido en Profundidad (DFS / Preorden en Arbol General).
+     * Explora una rama tan profundamente como sea posible antes de retroceder (backtracking).
+     * Orden de procesamiento: Nodo actual -> Subarbol hijo 1 -> Subarbol hijo 2 -> ... -> Subarbol hijo N.
+     *
+     * @return Lista ordenada cronologicamente de los elementos visitados en profundidad.
+     */
+    public List<T> traverseDFS() {
+        List<T> result = new ArrayList<>();
+        if (!isEmpty()) {
+            traverseDFSRecursive(root, result);
+        }
+        return result;
+    }
+
+    private void traverseDFSRecursive(TreeNode<T> current, List<T> result) {
+        if (current == null) {
+            return;
+        }
+        result.add(current.getData());
+        for (TreeNode<T> child : current.getChildren()) {
+            traverseDFSRecursive(child, result);
+        }
+    }
+
+    /**
+     * Recorrido Obligatorio 2: Recorrido por Niveles (BFS en Arbol General).
+     * Explora la jerarquia nivel a nivel utilizando una Cola (Queue FIFO).
+     * Primero procesa los nodos mas cercanos a la raiz (nivel 0), posteriormente
+     * los de nivel 1 (programas), nivel 2 (semestres), nivel 3 (asignaturas) y finalmente nivel 4 (unidades).
+     *
+     * @return Lista ordenada de elementos visitados de arriba hacia abajo y de izquierda a derecha.
+     */
+    public List<T> traverseBFS() {
+        List<T> result = new ArrayList<>();
+        if (isEmpty()) {
+            return result;
+        }
+
+        Queue<TreeNode<T>> queue = new LinkedList<>();
+        queue.add(root);
+
+        while (!queue.isEmpty()) {
+            TreeNode<T> current = queue.poll();
+            result.add(current.getData());
+            for (TreeNode<T> child : current.getChildren()) {
+                queue.add(child);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Agrupa y retorna los elementos del arbol organizados formalmente por su nivel de profundidad.
+     * Facilita la explicacion pedagogica en sustentaciones demostrando el avance jerarquico.
+     *
+     * @return Mapa asociativo donde la clave es el nivel (0, 1, 2, ...) y el valor es la lista de elementos.
+     */
+    public Map<Integer, List<T>> getElementsByLevel() {
+        Map<Integer, List<T>> levelMap = new LinkedHashMap<>();
+        if (isEmpty()) {
+            return levelMap;
+        }
+
+        Queue<TreeNode<T>> queue = new LinkedList<>();
+        Queue<Integer> levelQueue = new LinkedList<>();
+
+        queue.add(root);
+        levelQueue.add(0);
+
+        while (!queue.isEmpty()) {
+            TreeNode<T> current = queue.poll();
+            int currentLevel = levelQueue.poll();
+
+            levelMap.computeIfAbsent(currentLevel, k -> new ArrayList<>()).add(current.getData());
+
+            for (TreeNode<T> child : current.getChildren()) {
+                queue.add(child);
+                levelQueue.add(currentLevel + 1);
+            }
+        }
+        return levelMap;
+    }
+
+    // =========================================================================
+    // REPRESENTACION VISUAL DEL ARBOL (SECCION 9 DE LA RUBRICA)
+    // =========================================================================
+
+    /**
+     * Genera la representacion textual grafica de la estructura jerarquica del arbol,
+     * utilizando conectores clasicos de arbol de directorios (├──, └──, │   ).
+     * Coincide exactamente con el estandar visual exigido en la Seccion 9 de la rubrica.
+     *
+     * @return Cadena formateada multilínea lista para impresion en consola.
+     */
+    public String renderAsciiTree() {
+        if (isEmpty()) {
+            return "(El arbol jerarquico se encuentra vacio)\n";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(root.getData().toString()).append("\n");
+        renderChildrenAscii(root, "", sb);
+        return sb.toString();
+    }
+
+    private void renderChildrenAscii(TreeNode<T> node, String prefix, StringBuilder sb) {
+        List<TreeNode<T>> children = node.getChildren();
+        for (int i = 0; i < children.size(); i++) {
+            TreeNode<T> child = children.get(i);
+            boolean isLast = (i == children.size() - 1);
+
+            sb.append(prefix);
+            sb.append(isLast ? "└── " : "├── ");
+            sb.append(child.getData().toString()).append("\n");
+
+            String nextPrefix = prefix + (isLast ? "    " : "│   ");
+            renderChildrenAscii(child, nextPrefix, sb);
+        }
     }
 }

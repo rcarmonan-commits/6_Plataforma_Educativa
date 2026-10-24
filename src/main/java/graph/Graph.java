@@ -3,9 +3,12 @@ package graph;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
 
 /**
@@ -15,18 +18,20 @@ import java.util.Set;
  * <p><b>¿Que es y que se hizo?</b><br>
  * Modela una red de relaciones dirigidas donde cada vertice representa un elemento
  * (asignatura) y cada arista representa una conexion unidireccional (prerrequisito),
- * administrando inserciones, eliminaciones limpias y consultas de grado.</p>
+ * administrando inserciones, eliminaciones limpias, consultas de grado y algoritmos
+ * de recorrido en anchura (BFS) y profundidad (DFS).</p>
  *
  * <p><b>¿Por que se uso?</b><br>
- * Cumple estrictamente con las Secciones 10, 11, 12 y 13 de la rubrica.
+ * Cumple estrictamente con las Secciones 10, 11, 12, 13, 14 y 15 de la rubrica.
  * La relacion de prerrequisitos entre asignaturas no es jerarquica ni simetrica
  * (si A es prerrequisito de B, B no lo es de A), lo cual exige un grafo dirigido
  * sin librerias externas automaticas.</p>
  *
  * <p><b>¿Como funciona?</b><br>
  * Almacena los vertices y sus aristas salientes en un {@code Map<V, List<Edge<V>>>}.
- * Al eliminar un vertice, purga tanto sus conexiones de salida como todas las aristas
- * entrantes desde otros vertices para mantener consistencia absoluta en la red.</p>
+ * BFS utiliza una cola FIFO para explorar por anillos o niveles de avance curricular,
+ * mientras que DFS utiliza recursion (pila de ejecucion) para explorar una linea
+ * de prerrequisitos hasta su maximo alcance antes de realizar backtracking.</p>
  *
  * @param <V> Tipo de dato de los vertices.
  */
@@ -309,5 +314,172 @@ public class Graph<V> {
 
     public boolean isEmpty() {
         return adjacencyMap.isEmpty();
+    }
+
+    // =========================================================================
+    // RECORRIDO BFS (SECCION 14 DE LA RUBRICA)
+    // =========================================================================
+
+    /**
+     * Recorrido BFS (Breadth-First Search / Busqueda en Anchura).
+     * Utiliza una estructura de cola (Queue FIFO) para explorar los vertices
+     * por niveles de distancia (anillos de saltos) respecto al vertice inicial.
+     *
+     * @param startIdentifier Identificador o dato del vertice inicial.
+     * @return Lista ordenada cronologicamente con los vertices visitados.
+     */
+    public List<V> bfs(Object startIdentifier) {
+        V startVertex = findVertex(startIdentifier);
+        if (startVertex == null) {
+            return Collections.emptyList();
+        }
+
+        List<V> traversal = new ArrayList<>();
+        Set<V> visited = new LinkedHashSet<>();
+        Queue<V> queue = new LinkedList<>();
+
+        visited.add(startVertex);
+        queue.add(startVertex);
+
+        while (!queue.isEmpty()) {
+            V current = queue.poll();
+            traversal.add(current);
+
+            List<Edge<V>> edges = adjacencyMap.get(current);
+            if (edges != null) {
+                for (Edge<V> edge : edges) {
+                    V neighbor = edge.getDestination();
+                    if (!visited.contains(neighbor)) {
+                        visited.add(neighbor);
+                        queue.add(neighbor);
+                    }
+                }
+            }
+        }
+
+        return traversal;
+    }
+
+    /**
+     * Ejecuta BFS agrupando pedagogicamente los vertices por niveles de distancia
+     * o saltos desde el vertice de inicio, tal como lo exige el ejemplo de la Seccion 14.
+     * Nivel 0: Vertice inicial
+     * Nivel 1: Asignaturas dependientes directas
+     * Nivel 2: Asignaturas dependientes de segundo orden, etc.
+     *
+     * @param startIdentifier Vertice de partida.
+     * @return Mapa donde la clave es el nivel de salto y el valor es la lista de vertices en dicho nivel.
+     */
+    public Map<Integer, List<V>> bfsByLevels(Object startIdentifier) {
+        V startVertex = findVertex(startIdentifier);
+        if (startVertex == null) {
+            return Collections.emptyMap();
+        }
+
+        Map<Integer, List<V>> levels = new LinkedHashMap<>();
+        Set<V> visited = new LinkedHashSet<>();
+        Queue<V> vertexQueue = new LinkedList<>();
+        Queue<Integer> levelQueue = new LinkedList<>();
+
+        visited.add(startVertex);
+        vertexQueue.add(startVertex);
+        levelQueue.add(0);
+
+        while (!vertexQueue.isEmpty()) {
+            V current = vertexQueue.poll();
+            int currentLevel = levelQueue.poll();
+
+            levels.computeIfAbsent(currentLevel, k -> new ArrayList<>()).add(current);
+
+            List<Edge<V>> edges = adjacencyMap.get(current);
+            if (edges != null) {
+                for (Edge<V> edge : edges) {
+                    V neighbor = edge.getDestination();
+                    if (!visited.contains(neighbor)) {
+                        visited.add(neighbor);
+                        vertexQueue.add(neighbor);
+                        levelQueue.add(currentLevel + 1);
+                    }
+                }
+            }
+        }
+
+        return levels;
+    }
+
+    // =========================================================================
+    // RECORRIDO DFS (SECCION 15 DE LA RUBRICA)
+    // =========================================================================
+
+    /**
+     * Recorrido DFS (Depth-First Search / Busqueda en Profundidad).
+     * Explora una rama de dependencias tan profundamente como sea posible
+     * antes de regresar (backtracking) y continuar por otra rama.
+     * Implementado mediante recursion utilizando la pila de ejecucion del sistema.
+     *
+     * @param startIdentifier Identificador o dato del vertice inicial.
+     * @return Lista ordenada con los vertices visitados en profundidad.
+     */
+    public List<V> dfs(Object startIdentifier) {
+        V startVertex = findVertex(startIdentifier);
+        if (startVertex == null) {
+            return Collections.emptyList();
+        }
+
+        List<V> traversal = new ArrayList<>();
+        Set<V> visited = new LinkedHashSet<>();
+
+        dfsRecursive(startVertex, visited, traversal);
+        return traversal;
+    }
+
+    private void dfsRecursive(V current, Set<V> visited, List<V> traversal) {
+        visited.add(current);
+        traversal.add(current);
+
+        List<Edge<V>> edges = adjacencyMap.get(current);
+        if (edges != null) {
+            for (Edge<V> edge : edges) {
+                V neighbor = edge.getDestination();
+                if (!visited.contains(neighbor)) {
+                    dfsRecursive(neighbor, visited, traversal);
+                }
+            }
+        }
+    }
+
+    /**
+     * Metodo comparativo y pedagógico que contrasta la exploracion BFS frente a DFS
+     * desde el mismo punto de origen, explicando la diferencia de comportamiento.
+     */
+    public String explainDifferenceBfsDfs(Object startIdentifier) {
+        V startVertex = findVertex(startIdentifier);
+        if (startVertex == null) {
+            return "El vertice consultado no existe en el grafo.";
+        }
+
+        List<V> bfsResult = bfs(startIdentifier);
+        List<V> dfsResult = dfs(startIdentifier);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== COMPARATIVA DE RECORRIDOS (VERTICE INICIAL: ").append(startVertex).append(") ===\n\n");
+        sb.append("1. RECORRIDO EN ANCHURA (BFS - Queue FIFO):\n");
+        sb.append("   Estrategia: Explora en anillos concentricos por nivel de avance semestral.\n");
+        sb.append("   Secuencia: ").append(bfsResult).append("\n\n");
+
+        sb.append("2. RECORRIDO EN PROFUNDIDAD (DFS - Recursion LIFO):\n");
+        sb.append("   Estrategia: Sigue una linea de prerrequisitos hasta la materia final antes de retroceder.\n");
+        sb.append("   Secuencia: ").append(dfsResult).append("\n\n");
+
+        sb.append("3. ANALISIS ACADEMICO:\n");
+        if (bfsResult.equals(dfsResult)) {
+            sb.append("   Los recorridos coinciden porque la subred alcanzable es lineal (sin ramificaciones).\n");
+        } else {
+            sb.append("   Los recorridos DIFIEREN en el orden de visita. BFS visito primero todas las materias\n");
+            sb.append("   que dependen directamente del origen antes de avanzar, mientras que DFS se adentro\n");
+            sb.append("   hacia semestres avanzados por la primera ruta encontrada antes de visitar materias hermanas.\n");
+        }
+
+        return sb.toString();
     }
 }

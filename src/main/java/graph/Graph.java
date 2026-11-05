@@ -2,6 +2,8 @@ package graph;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -18,11 +20,11 @@ import java.util.Set;
  * <p><b>¿Que es y que se hizo?</b><br>
  * Modela una red de relaciones dirigidas donde cada vertice representa un elemento
  * (asignatura) y cada arista representa una conexion unidireccional (prerrequisito),
- * administrando inserciones, eliminaciones limpias, consultas de grado y algoritmos
- * de recorrido en anchura (BFS) y profundidad (DFS).</p>
+ * administrando inserciones, eliminaciones limpias, consultas de grado, recorridos
+ * (BFS y DFS), busqueda de camino minimo y algoritmo de deteccion de ciclos.</p>
  *
  * <p><b>¿Por que se uso?</b><br>
- * Cumple estrictamente con las Secciones 10, 11, 12, 13, 14 y 15 de la rubrica.
+ * Cumple estrictamente con las Secciones 10, 11, 12, 13, 14, 15 y 16 de la rubrica.
  * La relacion de prerrequisitos entre asignaturas no es jerarquica ni simetrica
  * (si A es prerrequisito de B, B no lo es de A), lo cual exige un grafo dirigido
  * sin librerias externas automaticas.</p>
@@ -30,8 +32,8 @@ import java.util.Set;
  * <p><b>¿Como funciona?</b><br>
  * Almacena los vertices y sus aristas salientes en un {@code Map<V, List<Edge<V>>>}.
  * BFS utiliza una cola FIFO para explorar por anillos o niveles de avance curricular,
- * mientras que DFS utiliza recursion (pila de ejecucion) para explorar una linea
- * de prerrequisitos hasta su maximo alcance antes de realizar backtracking.</p>
+ * mientras que DFS utiliza recursion para explorar en profundidad. La deteccion
+ * de ciclos utiliza una pila de recursion activa para certificar la aciclicidad (DAG).</p>
  *
  * @param <V> Tipo de dato de los vertices.
  */
@@ -89,7 +91,7 @@ public class Graph<V> {
     /**
      * Operacion Obligatoria 3: Agregar una conexion (arista dirigida).
      * Crea un vinculo unidireccional respetando la naturaleza del grafo dirigido
-     * (source -> destination).
+     * (source -> destination). Valida preventivamente contra dependencias circulares.
      *
      * @param source Vertice origen (prerrequisito habilitador).
      * @param destination Vertice destino (asignatura dependiente).
@@ -115,6 +117,12 @@ public class Graph<V> {
         if (actualDestination == null) {
             addVertex(destination);
             actualDestination = destination;
+        }
+
+        // Validacion preventiva: no permitir crear ciclos ilicitos
+        if (hasPath(actualDestination, actualSource)) {
+            throw new IllegalStateException("Integridad curricular: Agregar la conexion entre " +
+                    actualSource + " y " + actualDestination + " crearia una dependencia circular prohibida (ciclo).");
         }
 
         List<Edge<V>> edges = adjacencyMap.get(actualSource);
@@ -320,14 +328,6 @@ public class Graph<V> {
     // RECORRIDO BFS (SECCION 14 DE LA RUBRICA)
     // =========================================================================
 
-    /**
-     * Recorrido BFS (Breadth-First Search / Busqueda en Anchura).
-     * Utiliza una estructura de cola (Queue FIFO) para explorar los vertices
-     * por niveles de distancia (anillos de saltos) respecto al vertice inicial.
-     *
-     * @param startIdentifier Identificador o dato del vertice inicial.
-     * @return Lista ordenada cronologicamente con los vertices visitados.
-     */
     public List<V> bfs(Object startIdentifier) {
         V startVertex = findVertex(startIdentifier);
         if (startVertex == null) {
@@ -360,16 +360,6 @@ public class Graph<V> {
         return traversal;
     }
 
-    /**
-     * Ejecuta BFS agrupando pedagogicamente los vertices por niveles de distancia
-     * o saltos desde el vertice de inicio, tal como lo exige el ejemplo de la Seccion 14.
-     * Nivel 0: Vertice inicial
-     * Nivel 1: Asignaturas dependientes directas
-     * Nivel 2: Asignaturas dependientes de segundo orden, etc.
-     *
-     * @param startIdentifier Vertice de partida.
-     * @return Mapa donde la clave es el nivel de salto y el valor es la lista de vertices en dicho nivel.
-     */
     public Map<Integer, List<V>> bfsByLevels(Object startIdentifier) {
         V startVertex = findVertex(startIdentifier);
         if (startVertex == null) {
@@ -411,15 +401,6 @@ public class Graph<V> {
     // RECORRIDO DFS (SECCION 15 DE LA RUBRICA)
     // =========================================================================
 
-    /**
-     * Recorrido DFS (Depth-First Search / Busqueda en Profundidad).
-     * Explora una rama de dependencias tan profundamente como sea posible
-     * antes de regresar (backtracking) y continuar por otra rama.
-     * Implementado mediante recursion utilizando la pila de ejecucion del sistema.
-     *
-     * @param startIdentifier Identificador o dato del vertice inicial.
-     * @return Lista ordenada con los vertices visitados en profundidad.
-     */
     public List<V> dfs(Object startIdentifier) {
         V startVertex = findVertex(startIdentifier);
         if (startVertex == null) {
@@ -448,10 +429,6 @@ public class Graph<V> {
         }
     }
 
-    /**
-     * Metodo comparativo y pedagógico que contrasta la exploracion BFS frente a DFS
-     * desde el mismo punto de origen, explicando la diferencia de comportamiento.
-     */
     public String explainDifferenceBfsDfs(Object startIdentifier) {
         V startVertex = findVertex(startIdentifier);
         if (startVertex == null) {
@@ -481,5 +458,228 @@ public class Graph<V> {
         }
 
         return sb.toString();
+    }
+
+    // =========================================================================
+    // PROBLEMAS APLICADOS SOBRE EL GRAFO (SECCION 16 DE LA RUBRICA)
+    // =========================================================================
+
+    /**
+     * Determina si existe un camino dirigido desde el vertice origen hasta el destino.
+     *
+     * @param startIdentifier Vertice inicial.
+     * @param endIdentifier Vertice objetivo.
+     * @return {@code true} si existe al menos una ruta dirigida; {@code false} en caso contrario.
+     */
+    public boolean hasPath(Object startIdentifier, Object endIdentifier) {
+        V startVertex = findVertex(startIdentifier);
+        V endVertex = findVertex(endIdentifier);
+        if (startVertex == null || endVertex == null) {
+            return false;
+        }
+        if (Objects.equals(startVertex, endVertex)) {
+            return true;
+        }
+
+        Set<V> visited = new HashSet<>();
+        Queue<V> queue = new LinkedList<>();
+
+        visited.add(startVertex);
+        queue.add(startVertex);
+
+        while (!queue.isEmpty()) {
+            V current = queue.poll();
+            if (Objects.equals(current, endVertex)) {
+                return true;
+            }
+
+            List<Edge<V>> edges = adjacencyMap.get(current);
+            if (edges != null) {
+                for (Edge<V> edge : edges) {
+                    V neighbor = edge.getDestination();
+                    if (!visited.contains(neighbor)) {
+                        visited.add(neighbor);
+                        queue.add(neighbor);
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Problema Aplicado 1: Encontrar un camino entre dos elementos.
+     * Localiza una secuencia valida de prerrequisitos dirigida desde origen hasta destino.
+     *
+     * @param startIdentifier Vertice de partida.
+     * @param endIdentifier Vertice de llegada.
+     * @return Lista cronologica de vertices que componen la ruta o lista vacia si no hay camino.
+     */
+    public List<V> findPath(Object startIdentifier, Object endIdentifier) {
+        V start = findVertex(startIdentifier);
+        V end = findVertex(endIdentifier);
+        if (start == null || end == null) {
+            return Collections.emptyList();
+        }
+
+        List<V> currentPath = new ArrayList<>();
+        Set<V> visited = new HashSet<>();
+        if (findPathDfs(start, end, visited, currentPath)) {
+            return currentPath;
+        }
+        return Collections.emptyList();
+    }
+
+    private boolean findPathDfs(V current, V target, Set<V> visited, List<V> currentPath) {
+        visited.add(current);
+        currentPath.add(current);
+
+        if (Objects.equals(current, target)) {
+            return true;
+        }
+
+        List<Edge<V>> edges = adjacencyMap.get(current);
+        if (edges != null) {
+            for (Edge<V> edge : edges) {
+                V neighbor = edge.getDestination();
+                if (!visited.contains(neighbor)) {
+                    if (findPathDfs(neighbor, target, visited, currentPath)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        currentPath.remove(currentPath.size() - 1);
+        return false;
+    }
+
+    /**
+     * Problema Aplicado 2: Encontrar el camino con menor cantidad de conexiones (menor numero de saltos).
+     * Utiliza BFS para garantizar la ruta minima en saltos en la malla curricular.
+     *
+     * @param startIdentifier Vertice de partida.
+     * @param endIdentifier Vertice de llegada.
+     * @return Lista de vertices en el camino mas corto en saltos o lista vacia si no existe.
+     */
+    public List<V> findShortestPathBFS(Object startIdentifier, Object endIdentifier) {
+        V start = findVertex(startIdentifier);
+        V end = findVertex(endIdentifier);
+        if (start == null || end == null) {
+            return Collections.emptyList();
+        }
+
+        if (Objects.equals(start, end)) {
+            return Collections.singletonList(start);
+        }
+
+        Map<V, V> parentMap = new HashMap<>();
+        Set<V> visited = new HashSet<>();
+        Queue<V> queue = new LinkedList<>();
+
+        visited.add(start);
+        queue.add(start);
+
+        boolean found = false;
+        while (!queue.isEmpty()) {
+            V current = queue.poll();
+            if (Objects.equals(current, end)) {
+                found = true;
+                break;
+            }
+
+            List<Edge<V>> edges = adjacencyMap.get(current);
+            if (edges != null) {
+                for (Edge<V> edge : edges) {
+                    V neighbor = edge.getDestination();
+                    if (!visited.contains(neighbor)) {
+                        visited.add(neighbor);
+                        parentMap.put(neighbor, current);
+                        queue.add(neighbor);
+                    }
+                }
+            }
+        }
+
+        if (!found) {
+            return Collections.emptyList();
+        }
+
+        LinkedList<V> path = new LinkedList<>();
+        V step = end;
+        while (step != null) {
+            path.addFirst(step);
+            step = parentMap.get(step);
+        }
+
+        return path;
+    }
+
+    /**
+     * Problema Aplicado 3: Detectar Ciclos en el Grafo (Dependencias Circulares).
+     * En una malla curricular universitaria, una asignatura no puede ser directa ni
+     * indirectamente prerrequisito de si misma (el grafo DEBE ser un DAG).
+     * Utiliza DFS con seguimiento de pila de recursion (recursionStack).
+     *
+     * @return Lista de vertices que forman el ciclo detectado (ej. [A, B, C, A]) o lista vacia si es aciclico.
+     */
+    public List<V> detectCycle() {
+        Set<V> visited = new HashSet<>();
+        Set<V> recursionStack = new HashSet<>();
+        Map<V, V> parentMap = new HashMap<>();
+
+        for (V vertex : adjacencyMap.keySet()) {
+            if (!visited.contains(vertex)) {
+                List<V> cycle = detectCycleDfs(vertex, visited, recursionStack, parentMap);
+                if (cycle != null && !cycle.isEmpty()) {
+                    return cycle;
+                }
+            }
+        }
+
+        return Collections.emptyList();
+    }
+
+    private List<V> detectCycleDfs(V current, Set<V> visited, Set<V> recursionStack, Map<V, V> parentMap) {
+        visited.add(current);
+        recursionStack.add(current);
+
+        List<Edge<V>> edges = adjacencyMap.get(current);
+        if (edges != null) {
+            for (Edge<V> edge : edges) {
+                V neighbor = edge.getDestination();
+
+                if (!visited.contains(neighbor)) {
+                    parentMap.put(neighbor, current);
+                    List<V> cycle = detectCycleDfs(neighbor, visited, recursionStack, parentMap);
+                    if (cycle != null) {
+                        return cycle;
+                    }
+                } else if (recursionStack.contains(neighbor)) {
+                    // Ciclo detectado (arista de retroceso hacia un ancestro activo)
+                    List<V> cycle = new ArrayList<>();
+                    cycle.add(neighbor);
+                    V curr = current;
+                    while (curr != null && !Objects.equals(curr, neighbor)) {
+                        cycle.add(curr);
+                        curr = parentMap.get(curr);
+                    }
+                    cycle.add(neighbor);
+                    Collections.reverse(cycle);
+                    return cycle;
+                }
+            }
+        }
+
+        recursionStack.remove(current);
+        return null;
+    }
+
+    /**
+     * Verifica preventivamente si el grafo contiene algun ciclo activo.
+     */
+    public boolean hasCycle() {
+        return !detectCycle().isEmpty();
     }
 }

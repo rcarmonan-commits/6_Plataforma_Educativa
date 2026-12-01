@@ -243,7 +243,7 @@ commit 808e8da - 2026-08-12 16:11:00 - chore: inicializar estructura del proyect
 ## 10. Enlaces Oficiales de Entrega
 
 * **Repositorio Público de GitHub:**  
-  [https://github.com/rosary/6_Plataforma_Educativa](https://github.com/rosary/6_Plataforma_Educativa) *(o enlace asignado tras sincronización)*  
+  [https://github.com/rcarmonan-commits/6_Plataforma_Educativa](https://github.com/rcarmonan-commits/6_Plataforma_Educativa)  
 * **Video de Sustentación Académica:**  
   *(Enlace público a YouTube / Google Drive con permisos abiertos de visualización)*  
 * **Plataforma Académica Oficial:**  
